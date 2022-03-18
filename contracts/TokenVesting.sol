@@ -65,7 +65,7 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         require(vestingSchedules[vestingScheduleId].initialized == true);
         require(vestingSchedules[vestingScheduleId].revoked == false);
         _;
-    }
+    } 
 
 
     /**
@@ -73,7 +73,7 @@ contract TokenVesting is Ownable, ReentrancyGuard{
     */
     modifier onlyIfVestingScheduleNotLocked(bytes32 vestingScheduleId) {
         require(vestingSchedules[vestingScheduleId].initialized == true);
-        require(vestingSchedules[vestingScheduleId].locked == false);
+        require(vestingSchedules[vestingScheduleId].locked == false, "TokenVesting: vesting is locked" );
         _;
     }
 
@@ -214,28 +214,15 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         vestingSchedule.revoked = true;
     }
 
-
     /**
-    * @notice Locks the vesting schedule for given identifier.
+    * @notice setLocks for the vesting schedule with given identifier.
     * @param vestingScheduleId the vesting schedule identifier
     */
-    function lock(bytes32 vestingScheduleId)
-        public
-        onlyOwner
-        onlyIfVestingScheduleNotLocked(vestingScheduleId){
-        VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
-        vestingSchedule.locked = true;
-    }
-
-    /**
-    * @notice Unlocks the vesting schedule for given identifier.
-    * @param vestingScheduleId the vesting schedule identifier
-    */
-    function unlock(bytes32 vestingScheduleId)
+    function setLock(bytes32 vestingScheduleId, bool locked)
         public
         onlyOwner{
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
-        vestingSchedule.locked = false;
+        vestingSchedule.locked = locked;
     }
 
     /**
@@ -261,12 +248,11 @@ contract TokenVesting is Ownable, ReentrancyGuard{
     )
         public
         nonReentrant
+        onlyIfVestingScheduleNotLocked(vestingScheduleId)
         onlyIfVestingScheduleNotRevoked(vestingScheduleId){
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
         bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
         bool isOwner = msg.sender == owner();
-
-        require(!vestingSchedule.locked, "TokenVesting: vesting is locked");
 
         require(
             isBeneficiary || isOwner,

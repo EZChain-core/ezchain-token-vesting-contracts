@@ -330,7 +330,7 @@ describe("TokenVesting", function () {
           0
         );
 
-      await tokenVesting.connect(owner).lock(vestingScheduleId);
+      await tokenVesting.connect(owner).setLock(vestingScheduleId, true);
 
       // check that only beneficiary can try to release vested tokens
       await expect(
@@ -339,7 +339,7 @@ describe("TokenVesting", function () {
         "TokenVesting: vesting is locked"
       );
 
-      await tokenVesting.connect(owner).unlock(vestingScheduleId);
+      await tokenVesting.connect(owner).setLock(vestingScheduleId, false);
 
       // set current time after the end of the vesting period
       await tokenVesting.setCurrentTime(baseTime + duration + 1);
