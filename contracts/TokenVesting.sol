@@ -54,7 +54,7 @@ contract TokenVesting is Ownable, ReentrancyGuard{
     * @dev Reverts if no vesting schedule matches the passed identifier.
     */
     modifier onlyIfVestingScheduleExists(bytes32 vestingScheduleId) {
-        require(vestingSchedules[vestingScheduleId].initialized == true, "TokenVesting: vesting not exists");
+        require(vestingSchedules[vestingScheduleId].initialized == true, "TokenVesting: not exists");
         _;
     }
 
@@ -62,8 +62,8 @@ contract TokenVesting is Ownable, ReentrancyGuard{
     * @dev Reverts if the vesting schedule does not exist or has been revoked.
     */
     modifier onlyIfVestingScheduleNotRevoked(bytes32 vestingScheduleId) {
-        require(vestingSchedules[vestingScheduleId].initialized == true, "TokenVesting: vesting not exists");
-        require(vestingSchedules[vestingScheduleId].revoked == false, "TokenVesting: vesting is revoked");
+        require(vestingSchedules[vestingScheduleId].initialized == true, "TokenVesting: not exists");
+        require(vestingSchedules[vestingScheduleId].revoked == false, "TokenVesting: revoked");
         _;
     } 
 
@@ -72,8 +72,8 @@ contract TokenVesting is Ownable, ReentrancyGuard{
     * @dev Reverts if the vesting schedule does not exist or has been locked.
     */
     modifier onlyIfVestingScheduleNotLocked(bytes32 vestingScheduleId) {
-        require(vestingSchedules[vestingScheduleId].initialized == true);
-        require(vestingSchedules[vestingScheduleId].locked == false, "TokenVesting: vesting is locked" );
+        require(vestingSchedules[vestingScheduleId].initialized == true, "TokenVesting: not exists");
+        require(vestingSchedules[vestingScheduleId].locked == false, "TokenVesting: locked" );
         _;
     }
 

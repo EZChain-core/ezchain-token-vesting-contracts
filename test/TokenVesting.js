@@ -336,7 +336,7 @@ describe("TokenVesting", function () {
       await expect(
         tokenVesting.connect(addr1).release(vestingScheduleId, 100)
       ).to.be.revertedWith(
-        "TokenVesting: vesting is locked"
+        "TokenVesting: locked"
       );
 
       // add delay time after locking
