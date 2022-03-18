@@ -35,6 +35,8 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         uint256  released;
         // whether or not the vesting has been revoked
         bool revoked;
+        // whether or not the vesting has been locked
+        bool locked;
     }
 
     // address of the ERC20 token
@@ -62,6 +64,16 @@ contract TokenVesting is Ownable, ReentrancyGuard{
     modifier onlyIfVestingScheduleNotRevoked(bytes32 vestingScheduleId) {
         require(vestingSchedules[vestingScheduleId].initialized == true, "TokenVesting: vesting not exists");
         require(vestingSchedules[vestingScheduleId].revoked == false, "TokenVesting: vesting is revoked");
+        _;
+    } 
+
+
+    /**
+    * @dev Reverts if the vesting schedule does not exist or has been locked.
+    */
+    modifier onlyIfVestingScheduleNotLocked(bytes32 vestingScheduleId) {
+        require(vestingSchedules[vestingScheduleId].initialized == true);
+        require(vestingSchedules[vestingScheduleId].locked == false, "TokenVesting: vesting is locked" );
         _;
     }
 
@@ -174,6 +186,7 @@ contract TokenVesting is Ownable, ReentrancyGuard{
             _revocable,
             _amount,
             0,
+            false,
             false
         );
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.add(_amount);
@@ -202,6 +215,17 @@ contract TokenVesting is Ownable, ReentrancyGuard{
     }
 
     /**
+    * @notice setLocks for the vesting schedule with given identifier.
+    * @param vestingScheduleId the vesting schedule identifier
+    */
+    function setLock(bytes32 vestingScheduleId, bool locked)
+        public
+        onlyOwner{
+        VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
+        vestingSchedule.locked = locked;
+    }
+
+    /**
     * @notice Withdraw the specified amount if possible.
     * @param amount the amount to withdraw
     */
@@ -224,10 +248,12 @@ contract TokenVesting is Ownable, ReentrancyGuard{
     )
         public
         nonReentrant
+        onlyIfVestingScheduleNotLocked(vestingScheduleId)
         onlyIfVestingScheduleNotRevoked(vestingScheduleId){
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
         bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
         bool isOwner = msg.sender == owner();
+
         require(
             isBeneficiary || isOwner,
             "TokenVesting: only beneficiary and owner can release vested tokens"
