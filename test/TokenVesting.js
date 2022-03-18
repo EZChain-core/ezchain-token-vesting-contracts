@@ -339,6 +339,9 @@ describe("TokenVesting", function () {
         "TokenVesting: vesting is locked"
       );
 
+      // add delay time after locking
+      await tokenVesting.setCurrentTime(baseTime + 100);
+
       await tokenVesting.connect(owner).setLock(vestingScheduleId, false);
 
       // set current time after the end of the vesting period
