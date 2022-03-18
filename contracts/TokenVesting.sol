@@ -209,8 +209,8 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         if(vestedAmount > 0){
             release(vestingScheduleId, vestedAmount);
         }
-        uint256 unreleased = vestingSchedule.amountTotal.sub(vestingSchedule.released);
-        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(unreleased);
+        uint256 unreleased = vestingSchedule.amountTotal.sub(vestingSchedule.released, "TokenVesting: unreleased overflow");
+        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(unreleased, "TokenVesting: vestingSchedulesTotalAmount overflow");
         vestingSchedule.revoked = true;
     }
 
@@ -262,7 +262,7 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         require(vestedAmount >= amount, "TokenVesting: cannot release tokens, not enough vested tokens");
         vestingSchedule.released = vestingSchedule.released.add(amount);
         address payable beneficiaryPayable = payable(vestingSchedule.beneficiary);
-        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(amount);
+        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(amount, "TokenVesting: vestingSchedulesTotalAmount overflow");
         _token.safeTransfer(beneficiaryPayable, amount);
     }
 
@@ -309,7 +309,7 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         public
         view
         returns(uint256){
-        return _token.balanceOf(address(this)).sub(vestingSchedulesTotalAmount);
+        return _token.balanceOf(address(this)).sub(vestingSchedulesTotalAmount, "TokenVesting: WithdrawableAmount overflow");
     }
 
     /**
@@ -354,14 +354,14 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         if ((currentTime < vestingSchedule.cliff) || vestingSchedule.revoked == true) {
             return 0;
         } else if (currentTime >= vestingSchedule.start.add(vestingSchedule.duration)) {
-            return vestingSchedule.amountTotal.sub(vestingSchedule.released);
+            return vestingSchedule.amountTotal.sub(vestingSchedule.released, "TokenVesting: ReleasableAmount overflow");
         } else {
-            uint256 timeFromStart = currentTime.sub(vestingSchedule.start);
+            uint256 timeFromStart = currentTime.sub(vestingSchedule.start, "TokenVesting: timeFromStart overflow");
             uint secondsPerSlice = vestingSchedule.slicePeriodSeconds;
-            uint256 vestedSlicePeriods = timeFromStart.div(secondsPerSlice);
+            uint256 vestedSlicePeriods = timeFromStart.div(secondsPerSlice, "TokenVesting: secondsPerSlice cannot be zero");
             uint256 vestedSeconds = vestedSlicePeriods.mul(secondsPerSlice);
-            uint256 vestedAmount = vestingSchedule.amountTotal.mul(vestedSeconds).div(vestingSchedule.duration);
-            vestedAmount = vestedAmount.sub(vestingSchedule.released);
+            uint256 vestedAmount = vestingSchedule.amountTotal.mul(vestedSeconds).div(vestingSchedule.duration, "TokenVesting: duration cannot be zero");
+            vestedAmount = vestedAmount.sub(vestingSchedule.released, "TokenVesting: vestedAmount overflow");
             return vestedAmount;
         }
     }
