@@ -209,7 +209,7 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         if(vestedAmount > 0){
             release(vestingScheduleId, vestedAmount);
         }
-        uint256 unreleased = vestingSchedule.amountTotal.sub(vestingSchedule.released, "TokenVesting: overflow");
+        uint256 unreleased = vestingSchedule.amountTotal.sub(vestingSchedule.released, "TokenVesting: unreleased overflow");
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(unreleased, "TokenVesting: overflow");
         vestingSchedule.revoked = true;
     }
