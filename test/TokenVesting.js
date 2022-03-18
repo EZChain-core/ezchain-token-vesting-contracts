@@ -297,5 +297,66 @@ describe("TokenVesting", function () {
         )
       ).to.be.revertedWith("TokenVesting: amount must be > 0");
     });
+
+    it("lock and unlock vesting", async function () {
+      const tokenVesting = await TokenVesting.deploy(testToken.address);
+      await tokenVesting.deployed();
+      await testToken.transfer(tokenVesting.address, 1000);
+
+      const baseTime = 1622551248;
+      const beneficiary = addr1;
+      const startTime = baseTime;
+      const cliff = 0;
+      const duration = 1000;
+      const slicePeriodSeconds = 1;
+      const revokable = true;
+      const amount = 100;
+
+      // create new vesting schedule
+      await tokenVesting.createVestingSchedule(
+        beneficiary.address,
+        startTime,
+        cliff,
+        duration,
+        slicePeriodSeconds,
+        revokable,
+        amount
+      );
+
+      // compute vesting schedule id
+      const vestingScheduleId =
+        await tokenVesting.computeVestingScheduleIdForAddressAndIndex(
+          beneficiary.address,
+          0
+        );
+
+      await tokenVesting.connect(owner).lock(vestingScheduleId);
+
+      // check that only beneficiary can try to release vested tokens
+      await expect(
+        tokenVesting.connect(addr1).release(vestingScheduleId, 100)
+      ).to.be.revertedWith(
+        "TokenVesting: vesting is locked"
+      );
+
+      await tokenVesting.connect(owner).unlock(vestingScheduleId);
+
+      // set current time after the end of the vesting period
+      await tokenVesting.setCurrentTime(baseTime + duration + 1);
+
+      // check that vested amount is 100
+      expect(
+        await tokenVesting.computeReleasableAmount(vestingScheduleId)
+      ).to.be.equal(100);
+
+      // check that only beneficiary can try to release vested tokens
+      await tokenVesting.connect(addr1).release(vestingScheduleId, 100)
+
+      // check that vested amount is 0
+      expect(
+        await tokenVesting.computeReleasableAmount(vestingScheduleId)
+      ).to.be.equal(0);
+
+    });
   });
 });

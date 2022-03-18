@@ -35,6 +35,8 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         uint256  released;
         // whether or not the vesting has been revoked
         bool revoked;
+        // whether or not the vesting has been locked
+        bool locked;
     }
 
     // address of the ERC20 token
@@ -62,6 +64,16 @@ contract TokenVesting is Ownable, ReentrancyGuard{
     modifier onlyIfVestingScheduleNotRevoked(bytes32 vestingScheduleId) {
         require(vestingSchedules[vestingScheduleId].initialized == true);
         require(vestingSchedules[vestingScheduleId].revoked == false);
+        _;
+    }
+
+
+    /**
+    * @dev Reverts if the vesting schedule does not exist or has been locked.
+    */
+    modifier onlyIfVestingScheduleNotLocked(bytes32 vestingScheduleId) {
+        require(vestingSchedules[vestingScheduleId].initialized == true);
+        require(vestingSchedules[vestingScheduleId].locked == false);
         _;
     }
 
@@ -174,6 +186,7 @@ contract TokenVesting is Ownable, ReentrancyGuard{
             _revocable,
             _amount,
             0,
+            false,
             false
         );
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.add(_amount);
@@ -199,6 +212,30 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         uint256 unreleased = vestingSchedule.amountTotal.sub(vestingSchedule.released);
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(unreleased);
         vestingSchedule.revoked = true;
+    }
+
+
+    /**
+    * @notice Locks the vesting schedule for given identifier.
+    * @param vestingScheduleId the vesting schedule identifier
+    */
+    function lock(bytes32 vestingScheduleId)
+        public
+        onlyOwner
+        onlyIfVestingScheduleNotLocked(vestingScheduleId){
+        VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
+        vestingSchedule.locked = true;
+    }
+
+    /**
+    * @notice Unlocks the vesting schedule for given identifier.
+    * @param vestingScheduleId the vesting schedule identifier
+    */
+    function unlock(bytes32 vestingScheduleId)
+        public
+        onlyOwner{
+        VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
+        vestingSchedule.locked = false;
     }
 
     /**
@@ -228,6 +265,9 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
         bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
         bool isOwner = msg.sender == owner();
+
+        require(!vestingSchedule.locked, "TokenVesting: vesting is locked");
+
         require(
             isBeneficiary || isOwner,
             "TokenVesting: only beneficiary and owner can release vested tokens"
