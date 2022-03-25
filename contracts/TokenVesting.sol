@@ -335,6 +335,9 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         for (uint i = 0; i < count; i++) {
             VestingSchedule memory vestingSchedule = getVestingSchedule(computeVestingScheduleIdForAddressAndIndex(msg.sender, i));
 
+            if (vestingSchedule.locked){
+                continue;
+            }
             uint256 vestedAmount = _computeReleasableAmount(vestingSchedule);
 
             vestingSchedule.released = vestingSchedule.released.add(vestedAmount);
