@@ -283,16 +283,17 @@ contract TokenVesting is Ownable, ReentrancyGuard{
 
     /**
     * @notice Withdraw vested amount of tokens from all schedules of sender
-    * @return the total vested amount of tokens of sender
+    * @return total vested tokens of sender
     */
     function investorWithdraw(bool keepWrapped)
         public
-        nonReentrant returns (uint){
+        nonReentrant returns (uint total){
 
-        uint256 count = holdersVestingCount[msg.sender];
-        uint256 total = 0;
-        for (uint i = 0; i < count; i++) {
+        for (uint i = 0; i < holdersVestingCount[msg.sender]; i++) {
             VestingSchedule memory vestingSchedule = getVestingSchedule(computeVestingScheduleIdForAddressAndIndex(msg.sender, i));
+            bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
+
+            require(isBeneficiary, "TokenVesting: only beneficiary can withdraw");
 
             uint256 vestedAmount = _computeReleasableAmount(vestingSchedule);
 
