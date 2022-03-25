@@ -9,6 +9,20 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
+
+interface WEZC {
+    function withdraw(uint wad) external;
+}
+
+// helper methods for interacting with ERC20 tokens and sending ETH that do not consistently return true/false
+library TransferHelper {
+    function safeTransferETH(address to, uint256 value) internal {
+        (bool success, ) = to.call{value: value}(new bytes(0));
+        require(success, 'TransferHelper::safeTransferETH: ETH transfer failed');
+    }
+}
+
+
 /**
  * @title TokenVesting
  */
@@ -265,6 +279,47 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(amount, "TokenVesting: overflow");
         _token.safeTransfer(beneficiaryPayable, amount);
     }
+
+
+    /**
+    * @notice Withdraw vested amount of tokens from all schedules of sender
+    * @return total vested tokens of sender
+    */
+    function investorWithdraw(bool keepWrapped)
+        public
+        nonReentrant returns (uint total){
+
+        for (uint i = 0; i < holdersVestingCount[msg.sender]; i++) {
+            VestingSchedule memory vestingSchedule = getVestingSchedule(computeVestingScheduleIdForAddressAndIndex(msg.sender, i));
+            bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
+
+            require(isBeneficiary, "TokenVesting: only beneficiary can withdraw");
+
+            uint256 vestedAmount = _computeReleasableAmount(vestingSchedule);
+
+            if (vestingSchedule.locked || vestingSchedule.initialized == false || vestedAmount == 0){
+                continue;
+            }
+
+            vestingSchedule.released = vestingSchedule.released.add(vestedAmount);
+
+            total = total.add(vestedAmount);
+        }
+
+        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(total, "TokenVesting: overflow");
+
+
+        if (keepWrapped) {
+            _token.safeTransfer(msg.sender, total);
+        } else {
+            WEZC tok = WEZC(address(_token));
+            tok.withdraw(total);
+            TransferHelper.safeTransferETH(msg.sender, total);
+        }
+
+        return total;
+    }
+
 
     /**
     * @dev Returns the number of vesting schedules managed by this contract.
