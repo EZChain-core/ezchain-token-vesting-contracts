@@ -9,6 +9,61 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
+
+// helper methods for interacting with ERC20 tokens and sending ETH that do not consistently return true/false
+library TransferHelper {
+    function safeApprove(
+        address token,
+        address to,
+        uint256 value
+    ) internal {
+        // bytes4(keccak256(bytes('approve(address,uint256)')));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x095ea7b3, to, value));
+        require(
+            success && (data.length == 0 || abi.decode(data, (bool))),
+            'TransferHelper::safeApprove: approve failed'
+        );
+    }
+
+    function safeTransfer(
+        address token,
+        address to,
+        uint256 value
+    ) internal {
+        // bytes4(keccak256(bytes('transfer(address,uint256)')));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
+        require(
+            success && (data.length == 0 || abi.decode(data, (bool))),
+            'TransferHelper::safeTransfer: transfer failed'
+        );
+    }
+
+    function safeTransferFrom(
+        address token,
+        address from,
+        address to,
+        uint256 value
+    ) internal {
+        // bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, to, value));
+        require(
+            success && (data.length == 0 || abi.decode(data, (bool))),
+            'TransferHelper::transferFrom: transferFrom failed'
+        );
+    }
+
+    function safeTransferETH(address to, uint256 value) internal {
+        (bool success, ) = to.call{value: value}(new bytes(0));
+        require(success, 'TransferHelper::safeTransferETH: ETH transfer failed');
+    }
+}
+
+
+interface WEZC {
+    function withdraw(uint wad) external;
+}
+
+
 /**
  * @title TokenVesting
  */
@@ -265,6 +320,42 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(amount, "TokenVesting: overflow");
         _token.safeTransfer(beneficiaryPayable, amount);
     }
+
+
+    /**
+    * @notice Withdraw vested amount of tokens from all schedules of sender
+    * @return the total vested amount of tokens of sender
+    */
+    function investorWithdraw(bool keepERC)
+        public
+        nonReentrant returns (uint){
+
+        uint256 count = holdersVestingCount[msg.sender];
+        uint256 total = 0;
+        for (uint i = 0; i < count; i++) {
+            VestingSchedule memory vestingSchedule = getVestingSchedule(computeVestingScheduleIdForAddressAndIndex(msg.sender, i));
+
+            uint256 vestedAmount = _computeReleasableAmount(vestingSchedule);
+
+            vestingSchedule.released = vestingSchedule.released.add(vestedAmount);
+
+            total = total.add(vestedAmount);
+        }
+
+        vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(total, "TokenVesting: overflow");
+
+
+        if (keepERC) {
+            _token.safeTransfer(msg.sender, total);
+        } else {
+            WEZC tok = WEZC(address(_token));
+            tok.withdraw(total);
+            TransferHelper.safeTransferETH(msg.sender, total);
+        }
+
+        return total;
+    }
+
 
     /**
     * @dev Returns the number of vesting schedules managed by this contract.
