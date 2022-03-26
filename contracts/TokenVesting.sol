@@ -289,8 +289,13 @@ contract TokenVesting is Ownable, ReentrancyGuard{
         public
         nonReentrant returns (uint total){
 
+        bytes32 vestingScheduleId;
+
         for (uint i = 0; i < holdersVestingCount[msg.sender]; i++) {
-            VestingSchedule memory vestingSchedule = getVestingSchedule(computeVestingScheduleIdForAddressAndIndex(msg.sender, i));
+            vestingScheduleId = computeVestingScheduleIdForAddressAndIndex(msg.sender, i);
+
+            VestingSchedule storage vestingSchedule = vestingSchedules[vestingScheduleId];
+
             bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
 
             require(isBeneficiary, "TokenVesting: only beneficiary can withdraw");
@@ -305,7 +310,6 @@ contract TokenVesting is Ownable, ReentrancyGuard{
 
             total = total.add(vestedAmount);
         }
-
         vestingSchedulesTotalAmount = vestingSchedulesTotalAmount.sub(total, "TokenVesting: overflow");
 
 
