@@ -8,10 +8,12 @@ describe("TokenVesting", function () {
   let addr1;
   let addr2;
   let addrs;
+  let WEZC;
 
   before(async function () {
     Token = await ethers.getContractFactory("Token");
     TokenVesting = await ethers.getContractFactory("MockTokenVesting");
+    WEZC = await ethers.getContractFactory("contracts/WEZC.sol:WEZC");
   });
   beforeEach(async function () {
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
@@ -361,5 +363,102 @@ describe("TokenVesting", function () {
       ).to.be.equal(0);
 
     });
+
+
+
+
+    it("Investor withdraw", async function () {
+      wrappedEZC = await WEZC.deploy();
+      await wrappedEZC.deployed();
+
+      await owner.sendTransaction({
+        to: wrappedEZC.address,
+        value: ethers.utils.parseEther("2000"),
+      });
+
+      const tokenVesting = await TokenVesting.deploy(wrappedEZC.address);
+      await tokenVesting.deployed();
+
+      await wrappedEZC.transfer(tokenVesting.address, ethers.utils.parseEther("2"));
+
+
+      const baseTime = 1622551248;
+      const beneficiary = addr1;
+      const startTime = baseTime;
+      const cliff = 0;
+      const duration = 1000;
+      const slicePeriodSeconds = 1;
+      const revokable = true;
+      const amount = ethers.utils.parseEther("1");
+
+      // create 2 new vesting schedules
+      await tokenVesting.createVestingSchedule(
+        beneficiary.address,
+        startTime,
+        cliff,
+        duration,
+        slicePeriodSeconds,
+        revokable,
+        amount
+      );
+
+
+      await tokenVesting.createVestingSchedule(
+        beneficiary.address,
+        startTime,
+        cliff,
+        duration,
+        slicePeriodSeconds,
+        revokable,
+        amount
+      );
+
+
+      await tokenVesting.setCurrentTime(baseTime + 10);
+
+      // check balance of beneficiary after withdrawing to WEZC
+      await tokenVesting.connect(addr1).investorWithdraw(true);
+      let beneficiaryBalance = await wrappedEZC.balanceOf(beneficiary.address);
+      expect(beneficiaryBalance).to.equal(ethers.utils.parseEther("0.02"));
+
+      await tokenVesting.setCurrentTime(baseTime + 20);
+
+      // check balance of beneficiary after withdrawing token from vesting contract to WEZC
+      const balanceBefore = await ethers.provider.getBalance(beneficiary.address)
+      await tokenVesting.connect(addr1).investorWithdraw(false);
+      beneficiaryBalance = await wrappedEZC.balanceOf(beneficiary.address);
+
+      // Balance in WEZC should be unchanged (0.02)
+      expect(beneficiaryBalance).to.equal(ethers.utils.parseEther("0.02"));
+
+
+      // Balance in EZC must be increased
+      const balanceAfter = await ethers.provider.getBalance(beneficiary.address)
+      expect(balanceAfter - balanceBefore).to.greaterThan(0);
+
+
+      // Lock 1 of 2 schedules
+      const vestingScheduleId =
+        await tokenVesting.computeVestingScheduleIdForAddressAndIndex(
+          beneficiary.address,
+          0
+        );
+
+      await tokenVesting.connect(owner).setLock(vestingScheduleId, true);
+      await tokenVesting.setCurrentTime(baseTime + 30);
+
+      await tokenVesting.connect(addr1).investorWithdraw(true);
+
+      beneficiaryBalance = await wrappedEZC.balanceOf(beneficiary.address);
+
+      // Balance should be 0.03 instead of 0.04
+      expect(beneficiaryBalance).to.equal(ethers.utils.parseEther("0.03"));
+      await tokenVesting.connect(owner).setLock(vestingScheduleId, false);
+
+      await tokenVesting.setCurrentTime(baseTime + duration + 1);
+      await tokenVesting.connect(addr1).investorWithdraw(false);
+    });
+
+
   });
 });
